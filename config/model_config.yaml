@@ -1,0 +1,30 @@
+# Model Training Configuration
+model:
+  n_estimators: 100
+  max_depth: 10
+  random_state: 42
+
+training:
+  test_size: 0.2
+  random_state: 42
+
+# Quality Gates - Model must pass these to be deployed
+quality_gates:
+  min_accuracy: 0.85
+  min_precision: 0.80
+  min_recall: 0.80
+  min_f1: 0.80
+
+# Deployment Configuration
+deployment:
+  model_name: "customer_classifier"
+  version: "1.0.0"
+  environment: "staging"
+
+# Monitoring Configuration
+monitoring:
+  enable_alerts: true
+  alert_thresholds:
+    max_latency_ms: 1000
+    min_accuracy: 0.80
+    max_error_rate: 0.05
