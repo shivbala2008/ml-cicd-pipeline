@@ -10,8 +10,8 @@ env:
   PYTHON_VERSION: '3.12.3'
   MODEL_NAME: 'customer_classifier'
   REGISTRY: ghcr.io
-  # UPDATED: Use the standard GHCR image format
-  IMAGE_NAME: ${{ github.repository }}/${{ env.MODEL_NAME }}
+  # FIX: Set a simple base name here. We will construct the full tag inside the job.
+  IMAGE_NAME: ml-model-api 
 
 jobs:
   # Stage 1: Code Quality and Unit Tests
@@ -197,7 +197,8 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} # Use full GHCR tag
+        # FIX: Construct the full GHCR image tag here where env is fully loaded.
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }} 
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -227,7 +228,7 @@ jobs:
     - name: Deploy to staging environment
       run: |
         echo "🚀 Deploying to staging environment..."
-        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+        echo "Image: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest"
         echo "✅ Staging deployment completed"
 
     - name: Run smoke tests
@@ -247,7 +248,7 @@ jobs:
     - name: Deploy to production environment
       run: |
         echo "🚀 Deploying to production environment..."
-        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+        echo "Image: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest"
         echo "✅ Production deployment completed"
 
     - name: Run production health checks
