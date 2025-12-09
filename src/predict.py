@@ -1,128 +1,65 @@
-import logging
-import os
-from datetime import datetime
-
+# src/predict.py
 import joblib
+import os
 import numpy as np
-from flask import Flask, jsonify, request
+import pandas as pd
+from flask import Flask, request, jsonify
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# --- Configuration ---
+MODEL_PATH = 'models/model.joblib'
+APP = Flask(__name__)
+MODEL = None
 
-app = Flask(__name__)
-
-
-class ModelPredictor:
-    def __init__(self, model_path="models/model.joblib"):
-        """Initialize model predictor"""
-        self.model_path = model_path
-        self.model = None
-        self.model_info = {}
-        self.load_model()
-
-    def load_model(self):
-        """Load trained model"""
+def load_model():
+    """Load the model artifact from the file system."""
+    global MODEL
+    if os.path.exists(MODEL_PATH):
         try:
-            if os.path.exists(self.model_path):
-                self.model = joblib.load(self.model_path)
-
-                # Load model metrics if available
-                metrics_path = self.model_path.replace(".joblib", "_metrics.json")
-                if os.path.exists(metrics_path):
-                    import json
-
-                    with open(metrics_path, "r") as f:
-                        self.model_info = json.load(f)
-
-                logger.info(f"✅ Model loaded from {self.model_path}")
-                return True
-            else:
-                logger.error(f"❌ Model file not found: {self.model_path}")
-                return False
+            MODEL = joblib.load(MODEL_PATH)
+            print(f"INFO: Model loaded successfully from {MODEL_PATH}")
         except Exception as e:
-            logger.error(f"❌ Error loading model: {str(e)}")
-            return False
+            print(f"ERROR: Failed to load model: {e}")
+            MODEL = None
+    else:
+        print(f"WARNING: Model file not found at {MODEL_PATH}")
 
-    def predict(self, features):
-        """Make prediction"""
-        if self.model is None:
-            raise ValueError("Model not loaded")
+load_model()
 
-        # Validate input
-        if len(features) != 10:
-            raise ValueError(f"Expected 10 features, got {len(features)}")
+# --- API Endpoints ---
 
-        # Make prediction
-        features_array = np.array(features).reshape(1, -1)
-        prediction = self.model.predict(features_array)[0]
-        probabilities = self.model.predict_proba(features_array)[0]
-
-        return {
-            "prediction": int(prediction),
-            "probabilities": probabilities.tolist(),
-            "confidence": float(max(probabilities)),
-        }
-
-
-# Initialize predictor
-predictor = ModelPredictor()
-
-
-@app.route("/health", methods=["GET"])
+@APP.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
-    return jsonify(
-        {
-            "status": "healthy" if predictor.model is not None else "unhealthy",
-            "model_loaded": predictor.model is not None,
-            "model_info": predictor.model_info,
-            "timestamp": datetime.now().isoformat(),
-        }
-    )
+    """Simple health check endpoint."""
+    return jsonify({"status": "ok", "model_loaded": MODEL is not None}), 200
 
-
-@app.route("/predict", methods=["POST"])
+@APP.route('/predict', methods=['POST'])
 def predict():
-    """Prediction endpoint"""
+    """Prediction endpoint."""
+    if MODEL is None:
+        return jsonify({"error": "Model is not loaded"}), 503
+    
     try:
-        # Get input data
-        data = request.get_json()
+        data = request.get_json(force=True)
+        features = data.get('features')
 
-        if "features" not in data:
-            return jsonify({"error": "Missing features in request"}), 400
+        if not features or not isinstance(features, list) or len(features) < 3:
+            return jsonify({"error": "Invalid or missing 'features' list"}), 400
 
-        # Make prediction
-        result = predictor.predict(data["features"])
-
-        # Add metadata
-        result["timestamp"] = datetime.now().isoformat()
-        result["model_version"] = predictor.model_info.get("timestamp", "unknown")
-
-        logger.info(f"Prediction made: {result['prediction']}")
-        return jsonify(result)
+        # Create a DataFrame for prediction (matching the training data structure)
+        # NOTE: Assumes 3 features from the training script
+        input_data = pd.DataFrame([features[:3]], columns=['feature_1', 'feature_2', 'feature_3'])
+        
+        prediction = MODEL.predict(input_data)[0]
+        
+        return jsonify({
+            "prediction": int(prediction),
+            "status": "success"
+        }), 200
 
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e), "status": "failure"}), 500
 
-
-@app.route("/model/info", methods=["GET"])
-def model_info():
-    """Get model information"""
-    return jsonify(
-        {
-            "model_path": predictor.model_path,
-            "model_loaded": predictor.model is not None,
-            "model_metrics": predictor.model_info,
-        }
-    )
-
-
-if __name__ == "__main__":
-    if predictor.model is None:
-        logger.error("❌ Cannot start API - model not loaded")
-        exit(1)
-
-    logger.info("🚀 Starting ML prediction API...")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+if __name__ == '__main__':
+    # Flask defaults to port 5000
+    print(f"INFO: Starting Flask API on port 5000...")
+    APP.run(host='0.0.0.0', port=5000)
