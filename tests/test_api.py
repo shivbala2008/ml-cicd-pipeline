@@ -7,7 +7,7 @@ import pytest
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from predict import ModelPredictor, APP
+from predict import APP
 
 
 class TestPredictionAPI:
