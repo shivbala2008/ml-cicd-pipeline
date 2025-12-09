@@ -7,9 +7,10 @@ import pandas as pd
 from flask import Flask, request, jsonify
 
 # --- Configuration ---
-MODEL_PATH = 'models/model.joblib'
+MODEL_PATH = "models/model.joblib"
 APP = Flask(__name__)
 MODEL = None
+
 
 def load_model():
     """Load the model artifact from the file system."""
@@ -24,43 +25,46 @@ def load_model():
     else:
         print(f"WARNING: Model file not found at {MODEL_PATH}")
 
+
 load_model()
 
 # --- API Endpoints ---
 
-@APP.route('/health', methods=['GET'])
+
+@APP.route("/health", methods=["GET"])
 def health_check():
     """Simple health check endpoint."""
     return jsonify({"status": "ok", "model_loaded": MODEL is not None}), 200
 
-@APP.route('/predict', methods=['POST'])
+
+@APP.route("/predict", methods=["POST"])
 def predict():
     """Prediction endpoint."""
     if MODEL is None:
         return jsonify({"error": "Model is not loaded"}), 503
-    
+
     try:
         data = request.get_json(force=True)
-        features = data.get('features')
+        features = data.get("features")
 
         if not features or not isinstance(features, list) or len(features) < 3:
             return jsonify({"error": "Invalid or missing 'features' list"}), 400
 
         # Create a DataFrame for prediction (matching the training data structure)
         # NOTE: Assumes 3 features from the training script
-        input_data = pd.DataFrame([features[:3]], columns=['feature_1', 'feature_2', 'feature_3'])
-        
+        input_data = pd.DataFrame(
+            [features[:3]], columns=["feature_1", "feature_2", "feature_3"]
+        )
+
         prediction = MODEL.predict(input_data)[0]
-        
-        return jsonify({
-            "prediction": int(prediction),
-            "status": "success"
-        }), 200
+
+        return jsonify({"prediction": int(prediction), "status": "success"}), 200
 
     except Exception as e:
         return jsonify({"error": str(e), "status": "failure"}), 500
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Flask defaults to port 5000
     print(f"INFO: Starting Flask API on port 5000...")
-    APP.run(host='0.0.0.0', port=5000)
+    APP.run(host="0.0.0.0", port=5000)
